@@ -91,7 +91,14 @@ void PostCode::savePostCodes(postcode_t code)
     {
         firstPostCodeTimeSteady = postCodeTimeSteady;
         firstPostCodeUsSinceEpoch = tsUS; // uS since epoch for 1st post code
-        incrBootCycle();
+	 uint16_t count = currentBootCycleCount();
+        std::ifstream isEmpty(postCodeListPath / std::to_string(count),
+                              std::ios::binary);
+        isEmpty.seekg(0, std::ios::end);
+        if (!(isEmpty.tellg() == 8))
+        {
+            incrBootCycle();
+        }
     }
     else
     {
