@@ -46,31 +46,18 @@ std::vector<postcode_t> PostCode::getPostCodes(uint16_t index)
                                   std::to_string(maxBootCycleNum()).c_str()));
     }
     std::vector<postcode_t> codesVec;
-    if (1 == index && !postCodes.empty())
-    {
-        std::transform(postCodes.begin(), postCodes.end(),
-                       std::back_inserter(codesVec),
-                       [](const auto& kv) { return kv.second; });
-    }
-    else
-    {
         uint16_t bootNum = getBootNum(index);
 
         decltype(postCodes) codes;
         deserializePostCodes(postCodeListPath / std::to_string(bootNum), codes);
         std::transform(codes.begin(), codes.end(), std::back_inserter(codesVec),
                        [](const auto& kv) { return kv.second; });
-    }
     return codesVec;
 }
 
 std::map<uint64_t, postcode_t> PostCode::getPostCodesWithTimeStamp(
     uint16_t index)
 {
-    if (1 == index && !postCodes.empty())
-    {
-        return postCodes;
-    }
 
     uint16_t bootNum = getBootNum(index);
     decltype(postCodes) codes;
@@ -277,7 +264,7 @@ uint16_t PostCode::getBootNum(const uint16_t index) const
     }
     else
     {
-        bootNum = currentBootCycleIndex - index + 1;
+        bootNum = index;
     }
     return bootNum;
 }
