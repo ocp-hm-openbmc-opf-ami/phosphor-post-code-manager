@@ -100,28 +100,32 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                 std::string intfName;
                 std::map<std::string, std::variant<std::string>> msgData;
                 msg.read(intfName, msgData);
-                // Check if it was the Value property that changed.
-                auto valPropMap = msgData.find("CurrentHostState");
-                if (valPropMap != msgData.end())
+		auto currentHostStateProp = msgData.find("CurrentHostState");
+                if (currentHostStateProp == msgData.end())
                 {
-                    StateServer::Host::HostState currentHostState =
-                        StateServer::Host::convertHostStateFromString(
-                            std::get<std::string>(valPropMap->second));
-                    if (currentHostState == StateServer::Host::HostState::Off)
-                    {
-                        if (this->postCodes.empty())
-                        {
-                            std::cerr
-                                << "HostState changed to OFF. Empty "
-                                   "postcode log, keep boot cycle at "
-                                << this->currentBootCycleIndex << std::endl;
-                        }
-                        else
-                        {
-                            this->postCodes.clear();
-                        }
-                    }
+                    return;
                 }
+
+                if (!std::holds_alternative<std::string>(
+                                        currentHostStateProp->second))
+
+                {
+		    return;
+                }
+		auto newHostState =
+                    StateServer::Host::convertHostStateFromString(
+                        std::get<std::string>(currentHostStateProp->second));
+
+		if (newHostState ==
+                        StateServer::Host::HostState::Running &&
+                    previousHostState !=
+                        StateServer::Host::HostState::Running)
+                {
+                    this->postCodes.clear();
+                }
+
+                previousHostState = newHostState;
+
             })
     {
         phosphor::logging::log<phosphor::logging::level::INFO>(
@@ -154,6 +158,8 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
     std::map<uint64_t, postcode_t> postCodes;
     fs::path postCodeListPath;
     uint16_t currentBootCycleIndex = 0;
+    StateServer::Host::HostState previousHostState =
+        StateServer::Host::HostState::Off;
     sdbusplus::bus::match_t propertiesChangedSignalRaw;
     sdbusplus::bus::match_t propertiesChangedSignalCurrentHostState;
 
