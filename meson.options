@@ -16,9 +16,9 @@ option(
     'max-post-code-size-per-cycle',
     type: 'integer',
     min: 64,
-    max: 1024,
+    max: 8192,
     description: 'Maximum post code file size per cycle',
-    value: 512,
+    value: 6144,
 )
 option(
     'postcode-display-path',
