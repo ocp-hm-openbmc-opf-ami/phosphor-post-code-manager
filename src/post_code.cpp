@@ -39,6 +39,12 @@ void PostCode::deleteAll()
 
 std::vector<postcode_t> PostCode::getPostCodes(uint16_t index)
 {
+    if (index > maxBootCycleNum() || index == 0)
+    {
+        elog<InvalidArgument>(Argument::ARGUMENT_NAME("MAXBOOTCYCLECOUNT"),
+                              Argument::ARGUMENT_VALUE(
+                                  std::to_string(maxBootCycleNum()).c_str()));
+    }
     std::vector<postcode_t> codesVec;
     if (1 == index && !postCodes.empty())
     {

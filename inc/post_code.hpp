@@ -19,6 +19,7 @@
 #include <unistd.h>
 
 #include <phosphor-logging/elog-errors.hpp>
+#include <phosphor-logging/elog.hpp>
 #include <sdbusplus/timer.hpp>
 #include <xyz/openbmc_project/Collection/DeleteAll/server.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
@@ -53,6 +54,11 @@ using EventPtr = std::unique_ptr<sd_event, EventDeleter>;
 using primarycode_t = std::vector<uint8_t>;
 using secondarycode_t = std::vector<uint8_t>;
 using postcode_t = std::tuple<primarycode_t, secondarycode_t>;
+using ::phosphor::logging::elog;
+using ::sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument;
+using Argument =
+    ::phosphor::logging::xyz::openbmc_project::Common::InvalidArgument;
+
 namespace fs = std::filesystem;
 namespace StateServer = sdbusplus::xyz::openbmc_project::State::server;
 
