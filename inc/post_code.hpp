@@ -100,15 +100,16 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                 std::string intfName;
                 std::map<std::string, std::variant<std::string>> msgData;
                 msg.read(intfName, msgData);
-		auto valPropMap = msgData.find("CurrentHostState");
+                auto valPropMap = msgData.find("CurrentHostState");
                 if (valPropMap != msgData.end())
                 {
-		    if (!std::holds_alternative<std::string>(valPropMap->second))
+                    if (!std::holds_alternative<std::string>(
+                            valPropMap->second))
                     {
                         return;
                     }
-                    
-		    StateServer::Host::HostState currentHostState =
+
+                    StateServer::Host::HostState currentHostState =
                         StateServer::Host::convertHostStateFromString(
                             std::get<std::string>(valPropMap->second));
                     if (currentHostState == StateServer::Host::HostState::Off)
@@ -128,20 +129,20 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                             this->postCodes.clear();
                         }
                     }
-                 }
+                }
 
-		// Check if RequestedHostTransition changed.
-		auto requestedTransitionProp =
+                // Check if RequestedHostTransition changed.
+                auto requestedTransitionProp =
                     msgData.find("RequestedHostTransition");
                 if (requestedTransitionProp != msgData.end())
-		{
+                {
                     if (!std::holds_alternative<std::string>(
                             requestedTransitionProp->second))
                     {
                         return;
                     }
 
-		    auto requestedTransition =
+                    auto requestedTransition =
                         StateServer::Host::convertTransitionFromString(
                             std::get<std::string>(
                                 requestedTransitionProp->second));
@@ -151,7 +152,6 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                         this->postCodes.clear();
                     }
                 }
-
             })
     {
         phosphor::logging::log<phosphor::logging::level::INFO>(
