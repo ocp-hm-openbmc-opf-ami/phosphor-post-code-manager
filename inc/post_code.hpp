@@ -100,32 +100,57 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                 std::string intfName;
                 std::map<std::string, std::variant<std::string>> msgData;
                 msg.read(intfName, msgData);
-		auto currentHostStateProp = msgData.find("CurrentHostState");
-                if (currentHostStateProp == msgData.end())
+                auto valPropMap = msgData.find("CurrentHostState");
+                if (valPropMap != msgData.end())
                 {
-                    return;
+                    if (!std::holds_alternative<std::string>(
+                            valPropMap->second))
+                    {
+                        return;
+                    }
+
+                    StateServer::Host::HostState currentHostState =
+                        StateServer::Host::convertHostStateFromString(
+                            std::get<std::string>(valPropMap->second));
+                    if (currentHostState == StateServer::Host::HostState::Off)
+                    {
+                        if (this->postCodes.empty())
+                        {
+                            phosphor::logging::log<
+                                phosphor::logging::level::INFO>(
+                                "HostState changed to OFF. Empty postcode "
+                                "log, keep boot cycle unchanged",
+                                phosphor::logging::entry(
+                                    "BOOT_CYCLE_INDEX=%d",
+                                    this->currentBootCycleIndex));
+                        }
+                        else
+                        {
+                            this->postCodes.clear();
+                        }
+                    }
                 }
 
-                if (!std::holds_alternative<std::string>(
-                                        currentHostStateProp->second))
-
+                // Check if RequestedHostTransition changed.
+                auto requestedTransitionProp =
+                    msgData.find("RequestedHostTransition");
+                if (requestedTransitionProp != msgData.end())
                 {
-		    return;
+                    if (!std::holds_alternative<std::string>(
+                            requestedTransitionProp->second))
+                    {
+                        return;
+                    }
+                    auto requestedTransition =
+                        StateServer::Host::convertTransitionFromString(
+                            std::get<std::string>(
+                                requestedTransitionProp->second));
+                    if (requestedTransition ==
+                        StateServer::Host::Transition::ForceWarmReboot)
+                    {
+                        this->postCodes.clear();
+                    }
                 }
-		auto newHostState =
-                    StateServer::Host::convertHostStateFromString(
-                        std::get<std::string>(currentHostStateProp->second));
-
-		if (newHostState ==
-                        StateServer::Host::HostState::Running &&
-                    previousHostState !=
-                        StateServer::Host::HostState::Running)
-                {
-                    this->postCodes.clear();
-                }
-
-                previousHostState = newHostState;
-
             })
     {
         phosphor::logging::log<phosphor::logging::level::INFO>(
@@ -158,8 +183,6 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
     std::map<uint64_t, postcode_t> postCodes;
     fs::path postCodeListPath;
     uint16_t currentBootCycleIndex = 0;
-    StateServer::Host::HostState previousHostState =
-        StateServer::Host::HostState::Off;
     sdbusplus::bus::match_t propertiesChangedSignalRaw;
     sdbusplus::bus::match_t propertiesChangedSignalCurrentHostState;
 
