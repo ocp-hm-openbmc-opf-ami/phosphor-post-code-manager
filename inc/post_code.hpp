@@ -141,7 +141,6 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                     {
                         return;
                     }
-
                     auto requestedTransition =
                         StateServer::Host::convertTransitionFromString(
                             std::get<std::string>(
