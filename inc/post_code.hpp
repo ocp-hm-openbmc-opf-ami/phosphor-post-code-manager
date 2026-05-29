@@ -87,6 +87,12 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                 auto valPropMap = msgData.find("Value");
                 if (valPropMap != msgData.end())
                 {
+                    if (this->hostOff)
+                    {
+                        phosphor::logging::log<phosphor::logging::level::INFO>(
+                            "Ignoring post code while host is off");
+                        return;
+                    }
                     this->savePostCodes(
                         std::get<postcode_t>(valPropMap->second));
                 }
@@ -114,6 +120,8 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                             std::get<std::string>(valPropMap->second));
                     if (currentHostState == StateServer::Host::HostState::Off)
                     {
+                        this->hostOff = true;
+                        this->shutdownRequested = false;
                         if (this->postCodes.empty())
                         {
                             phosphor::logging::log<
@@ -126,7 +134,20 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                         }
                         else
                         {
+                            if (this->timer && this->timer->isRunning())
+                            {
+                                this->timer->stop();
+                            }
+                            this->serialize(this->postCodeListPath);
                             this->postCodes.clear();
+                        }
+                    }
+                    else if (currentHostState ==
+                             StateServer::Host::HostState::Running)
+                    {
+                        if (!this->shutdownRequested)
+                        {
+                            this->hostOff = false;
                         }
                     }
                 }
@@ -149,6 +170,12 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                         StateServer::Host::Transition::ForceWarmReboot)
                     {
                         this->postCodes.clear();
+                    }
+                    else if (requestedTransition ==
+                             StateServer::Host::Transition::Off)
+                    {
+                        this->shutdownRequested = true;
+                        this->hostOff = true;
                     }
                 }
             })
@@ -183,6 +210,8 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
     std::map<uint64_t, postcode_t> postCodes;
     fs::path postCodeListPath;
     uint16_t currentBootCycleIndex = 0;
+    bool hostOff = true;
+    bool shutdownRequested = false;
     sdbusplus::bus::match_t propertiesChangedSignalRaw;
     sdbusplus::bus::match_t propertiesChangedSignalCurrentHostState;
 
