@@ -145,7 +145,7 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                     else if (currentHostState ==
                              StateServer::Host::HostState::Running)
                     {
-	                this->hostOff = false;
+                        this->hostOff = false;
                         this->shutdownRequested = false;
                     }
                 }
