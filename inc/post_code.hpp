@@ -87,10 +87,10 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                 auto valPropMap = msgData.find("Value");
                 if (valPropMap != msgData.end())
                 {
-                    if (this->hostOff)
+                    if (this->shutdownRequested)
                     {
                         phosphor::logging::log<phosphor::logging::level::INFO>(
-                            "Ignoring post code while host is off");
+                            "Ignoring post code, shutdown requested");
                         return;
                     }
                     this->savePostCodes(
@@ -121,25 +121,32 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                     if (currentHostState == StateServer::Host::HostState::Off)
                     {
                         this->hostOff = true;
-                        this->shutdownRequested = false;
-                        if (this->postCodes.empty())
+                        this->shutdownRequested = true;
+                        if (this->timer && this->timer->isRunning())
                         {
-                            phosphor::logging::log<
-                                phosphor::logging::level::INFO>(
-                                "HostState changed to OFF. Empty postcode "
-                                "log, keep boot cycle unchanged",
-                                phosphor::logging::entry(
-                                    "BOOT_CYCLE_INDEX=%d",
-                                    this->currentBootCycleIndex));
+                            this->timer->stop();
                         }
-                        else
+                        if (!this->postCodes.empty())
                         {
-                            if (this->timer && this->timer->isRunning())
-                            {
-                                this->timer->stop();
-                            }
-                            this->serialize(this->postCodeListPath);
+                            // Discard shutdown-time codes and remove
+                            // any file the timer may have written
+                            fs::path codeFile =
+                                this->postCodeListPath /
+                                std::to_string(this->currentBootCycleIndex);
                             this->postCodes.clear();
+                            if (fs::exists(codeFile))
+                            {
+                                fs::remove(codeFile);
+                                if (this->currentBootCycleIndex > 0)
+                                {
+                                    this->currentBootCycleIndex--;
+                                }
+                                uint16_t count = this->currentBootCycleCount();
+                                if (count > 0)
+                                {
+                                    this->currentBootCycleCount(count - 1);
+                                }
+                            }
                         }
                     }
                     else if (currentHostState ==
@@ -174,11 +181,39 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                     {
                         this->shutdownRequested = true;
                     }
+                    else
+                    {
+                        this->shutdownRequested = false;
+                    }
                 }
             })
     {
         phosphor::logging::log<phosphor::logging::level::INFO>(
             "PostCode is created");
+        // current host state to sync hostOff on daemon restart
+        try
+        {
+            auto method = bus.new_method_call(
+                "xyz.openbmc_project.State.Host",
+                (HostStatePathPrefix + std::to_string(node)).c_str(),
+                "org.freedesktop.DBus.Properties", "Get");
+            method.append("xyz.openbmc_project.State.Host", "CurrentHostState");
+            auto reply = bus.call(method);
+            std::variant<std::string> currentState;
+            reply.read(currentState);
+            auto stateStr = std::get<std::string>(currentState);
+            auto state =
+                StateServer::Host::convertHostStateFromString(stateStr);
+            if (state == StateServer::Host::HostState::Running)
+            {
+                hostOff = false;
+            }
+        }
+        catch (const std::exception& e)
+        {
+            phosphor::logging::log<phosphor::logging::level::WARNING>(
+                "Failed to query initial host state, assuming host off");
+        }
         fs::create_directories(postCodeListPath);
         deserialize(postCodeListPath / CurrentBootCycleIndexName,
                     currentBootCycleIndex);
