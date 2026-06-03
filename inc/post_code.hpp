@@ -155,13 +155,13 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                     }
                     this->bootInProgress = false;
                 }
-                else if (currentHostState ==
-                         StateServer::Host::HostState::Running)
-                {
-                    this->hostOff = false;
-                    this->shutdownRequested = false;
-                    this->bootInProgress = true;
-                }
+            }
+            else if (currentHostState ==
+                     StateServer::Host::HostState::Running)
+            {
+                this->hostOff = false;
+                this->shutdownRequested = false;
+                this->bootInProgress = true;
             }
 
             // Check if RequestedHostTransition changed.
@@ -193,6 +193,7 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                     this->shutdownRequested = false;
                 }
             }
+        }
         })
         {
             phosphor::logging::log<phosphor::logging::level::INFO>(
