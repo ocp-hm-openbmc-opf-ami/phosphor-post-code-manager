@@ -80,21 +80,22 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                 PostCodePath + std::to_string(node),
                 "xyz.openbmc_project.State.Boot.Raw"),
             [this](sdbusplus::message_t& msg) {
-        std::string intfName;
-        std::map<std::string, std::variant<postcode_t>> msgData;
-        msg.read(intfName, msgData);
-        // Check if it was the Value property that changed.
-        auto valPropMap = msgData.find("Value");
-        if (valPropMap != msgData.end())
-        {
-            if (this->shutdownRequested)
-            {
-                phosphor::logging::log<phosphor::logging::level::INFO>(
-                    "Ignoring post code, shutdown requested");
-                return;
-            }
-            this->savePostCodes(std::get<postcode_t>(valPropMap->second));
-        }
+                std::string intfName;
+                std::map<std::string, std::variant<postcode_t>> msgData;
+                msg.read(intfName, msgData);
+                // Check if it was the Value property that changed.
+                auto valPropMap = msgData.find("Value");
+                if (valPropMap != msgData.end())
+                {
+                    if (this->shutdownRequested)
+                    {
+                        phosphor::logging::log<phosphor::logging::level::INFO>(
+                            "Ignoring post code, shutdown requested");
+                        return;
+                    }
+                    this->savePostCodes(
+                        std::get<postcode_t>(valPropMap->second));
+                }
             }),
         propertiesChangedSignalCurrentHostState(
             bus,
@@ -102,166 +103,167 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                 HostStatePathPrefix + std::to_string(node),
                 "xyz.openbmc_project.State.Host"),
             [this](sdbusplus::message_t& msg) {
-        std::string intfName;
-        std::map<std::string, std::variant<std::string>> msgData;
-        msg.read(intfName, msgData);
-        auto valPropMap = msgData.find("CurrentHostState");
-        if (valPropMap != msgData.end())
-        {
-            if (!std::holds_alternative<std::string>(valPropMap->second))
-            {
-                return;
-            }
-
-            StateServer::Host::HostState currentHostState =
-                StateServer::Host::convertHostStateFromString(
-                    std::get<std::string>(valPropMap->second));
-            if (currentHostState == StateServer::Host::HostState::Off)
-            {
-                this->hostOff = true;
-                this->shutdownRequested = true;
-                if (this->timer && this->timer->isRunning())
+                std::string intfName;
+                std::map<std::string, std::variant<std::string>> msgData;
+                msg.read(intfName, msgData);
+                auto valPropMap = msgData.find("CurrentHostState");
+                if (valPropMap != msgData.end())
                 {
-                    this->timer->stop();
-                }
-                if (!this->postCodes.empty())
-                {
-                    if (this->bootInProgress)
+                    if (!std::holds_alternative<std::string>(
+                            valPropMap->second))
                     {
-                        // Valid boot codes - persist them
-                        this->serialize(this->postCodeListPath);
+                        return;
                     }
-                    else
+
+                    StateServer::Host::HostState currentHostState =
+                        StateServer::Host::convertHostStateFromString(
+                            std::get<std::string>(valPropMap->second));
+                    if (currentHostState == StateServer::Host::HostState::Off)
                     {
-                        // Discard shutdown-time codes and remove
-                        // any file the timer may have written
-                        fs::path codeFile =
-                            this->postCodeListPath /
-                            std::to_string(this->currentBootCycleIndex);
-                        this->postCodes.clear();
-                        if (fs::exists(codeFile))
+                        this->hostOff = true;
+                        this->shutdownRequested = true;
+                        if (this->timer && this->timer->isRunning())
                         {
-                            fs::remove(codeFile);
-                            if (this->currentBootCycleIndex > 0)
+                            this->timer->stop();
+                        }
+                        if (!this->postCodes.empty())
+                        {
+                            if (this->bootInProgress)
                             {
-                                this->currentBootCycleIndex--;
+                                // Valid boot codes - persist them
+                                this->serialize(this->postCodeListPath);
                             }
-                            uint16_t count = this->currentBootCycleCount();
-                            if (count > 0)
+                            else
                             {
-                                this->currentBootCycleCount(count - 1);
+                                // Discard shutdown-time codes and remove
+                                // any file the timer may have written
+                                fs::path codeFile =
+                                    this->postCodeListPath /
+                                    std::to_string(this->currentBootCycleIndex);
+                                this->postCodes.clear();
+                                if (fs::exists(codeFile))
+                                {
+                                    fs::remove(codeFile);
+                                    if (this->currentBootCycleIndex > 0)
+                                    {
+                                        this->currentBootCycleIndex--;
+                                    }
+                                    uint16_t count =
+                                        this->currentBootCycleCount();
+                                    if (count > 0)
+                                    {
+                                        this->currentBootCycleCount(count - 1);
+                                    }
+                                }
                             }
+                            this->bootInProgress = false;
                         }
                     }
-                    this->bootInProgress = false;
-                }
-            }
-            else if (currentHostState ==
-                     StateServer::Host::HostState::Running)
-            {
-                this->hostOff = false;
-                this->shutdownRequested = false;
-                this->bootInProgress = true;
-            }
+                    else if (currentHostState ==
+                             StateServer::Host::HostState::Running)
+                    {
+                        this->hostOff = false;
+                        this->shutdownRequested = false;
+                        this->bootInProgress = true;
+                    }
 
-            // Check if RequestedHostTransition changed.
-            auto requestedTransitionProp =
-                msgData.find("RequestedHostTransition");
-            if (requestedTransitionProp != msgData.end())
-            {
-                if (!std::holds_alternative<std::string>(
-                        requestedTransitionProp->second))
-                {
-                    return;
+                    // Check if RequestedHostTransition changed.
+                    auto requestedTransitionProp =
+                        msgData.find("RequestedHostTransition");
+                    if (requestedTransitionProp != msgData.end())
+                    {
+                        if (!std::holds_alternative<std::string>(
+                                requestedTransitionProp->second))
+                        {
+                            return;
+                        }
+                        auto requestedTransition =
+                            StateServer::Host::convertTransitionFromString(
+                                std::get<std::string>(
+                                    requestedTransitionProp->second));
+                        if (requestedTransition ==
+                            StateServer::Host::Transition::ForceWarmReboot)
+                        {
+                            this->postCodes.clear();
+                            this->shutdownRequested = false;
+                        }
+                        else if (requestedTransition ==
+                                 StateServer::Host::Transition::Off)
+                        {
+                            this->shutdownRequested = true;
+                        }
+                        else
+                        {
+                            this->shutdownRequested = false;
+                        }
+                    }
                 }
-                auto requestedTransition =
-                    StateServer::Host::convertTransitionFromString(
-                        std::get<std::string>(requestedTransitionProp->second));
-                if (requestedTransition ==
-                    StateServer::Host::Transition::ForceWarmReboot)
-                {
-                    this->postCodes.clear();
-                    this->shutdownRequested = false;
-                }
-                else if (requestedTransition ==
-                         StateServer::Host::Transition::Off)
-                {
-                    this->shutdownRequested = true;
-                }
-                else
-                {
-                    this->shutdownRequested = false;
-                }
-            }
-        }
-        })
+            })
+    {
+        phosphor::logging::log<phosphor::logging::level::INFO>(
+            "PostCode is created");
+        // current host state to sync hostOff on daemon restart
+        try
         {
-            phosphor::logging::log<phosphor::logging::level::INFO>(
-                "PostCode is created");
-            // current host state to sync hostOff on daemon restart
-            try
+            auto method = bus.new_method_call(
+                "xyz.openbmc_project.State.Host",
+                (HostStatePathPrefix + std::to_string(node)).c_str(),
+                "org.freedesktop.DBus.Properties", "Get");
+            method.append("xyz.openbmc_project.State.Host", "CurrentHostState");
+            auto reply = bus.call(method);
+            std::variant<std::string> currentState;
+            reply.read(currentState);
+            auto stateStr = std::get<std::string>(currentState);
+            auto state =
+                StateServer::Host::convertHostStateFromString(stateStr);
+            if (state == StateServer::Host::HostState::Running)
             {
-                auto method = bus.new_method_call(
-                    "xyz.openbmc_project.State.Host",
-                    (HostStatePathPrefix + std::to_string(node)).c_str(),
-                    "org.freedesktop.DBus.Properties", "Get");
-                method.append("xyz.openbmc_project.State.Host",
-                              "CurrentHostState");
-                auto reply = bus.call(method);
-                std::variant<std::string> currentState;
-                reply.read(currentState);
-                auto stateStr = std::get<std::string>(currentState);
-                auto state =
-                    StateServer::Host::convertHostStateFromString(stateStr);
-                if (state == StateServer::Host::HostState::Running)
-                {
-                    hostOff = false;
-                    bootInProgress = true;
-                }
+                hostOff = false;
+                bootInProgress = true;
             }
-            catch (const std::exception& e)
-            {
-                phosphor::logging::log<phosphor::logging::level::WARNING>(
-                    "Failed to query initial host state, assuming host off");
-            }
-            fs::create_directories(postCodeListPath);
-            deserialize(postCodeListPath / CurrentBootCycleIndexName,
-                        currentBootCycleIndex);
-            uint16_t count = 0;
-            deserialize(postCodeListPath / CurrentBootCycleCountName, count);
-            currentBootCycleCount(count);
-            maxBootCycleNum(MAX_BOOT_CYCLE_COUNT);
         }
-        ~PostCode() {}
+        catch (const std::exception& e)
+        {
+            phosphor::logging::log<phosphor::logging::level::WARNING>(
+                "Failed to query initial host state, assuming host off");
+        }
+        fs::create_directories(postCodeListPath);
+        deserialize(postCodeListPath / CurrentBootCycleIndexName,
+                    currentBootCycleIndex);
+        uint16_t count = 0;
+        deserialize(postCodeListPath / CurrentBootCycleCountName, count);
+        currentBootCycleCount(count);
+        maxBootCycleNum(MAX_BOOT_CYCLE_COUNT);
+    }
+    ~PostCode() {}
 
-        std::vector<postcode_t> getPostCodes(uint16_t index) override;
-        std::map<uint64_t, postcode_t> getPostCodesWithTimeStamp(uint16_t index)
-            override;
-        void deleteAll() override;
+    std::vector<postcode_t> getPostCodes(uint16_t index) override;
+    std::map<uint64_t, postcode_t> getPostCodesWithTimeStamp(
+        uint16_t index) override;
+    void deleteAll() override;
 
-      private:
-        void incrBootCycle();
-        uint16_t getBootNum(const uint16_t index) const;
+  private:
+    void incrBootCycle();
+    uint16_t getBootNum(const uint16_t index) const;
 
-        std::unique_ptr<sdbusplus::Timer> timer;
-        sdbusplus::bus_t& bus;
-        EventPtr& event;
-        int node;
-        std::chrono::time_point<std::chrono::steady_clock>
-            firstPostCodeTimeSteady;
-        uint64_t firstPostCodeUsSinceEpoch;
-        std::map<uint64_t, postcode_t> postCodes;
-        fs::path postCodeListPath;
-        uint16_t currentBootCycleIndex = 0;
-        bool hostOff = true;
-        bool shutdownRequested = false;
-        bool bootInProgress = false;
-        sdbusplus::bus::match_t propertiesChangedSignalRaw;
-        sdbusplus::bus::match_t propertiesChangedSignalCurrentHostState;
+    std::unique_ptr<sdbusplus::Timer> timer;
+    sdbusplus::bus_t& bus;
+    EventPtr& event;
+    int node;
+    std::chrono::time_point<std::chrono::steady_clock> firstPostCodeTimeSteady;
+    uint64_t firstPostCodeUsSinceEpoch;
+    std::map<uint64_t, postcode_t> postCodes;
+    fs::path postCodeListPath;
+    uint16_t currentBootCycleIndex = 0;
+    bool hostOff = true;
+    bool shutdownRequested = false;
+    bool bootInProgress = false;
+    sdbusplus::bus::match_t propertiesChangedSignalRaw;
+    sdbusplus::bus::match_t propertiesChangedSignalCurrentHostState;
 
-        void savePostCodes(postcode_t code);
-        fs::path serialize(const fs::path& path);
-        bool deserialize(const fs::path& path, uint16_t& index);
-        bool deserializePostCodes(const fs::path& path,
-                                  std::map<uint64_t, postcode_t>& codes);
+    void savePostCodes(postcode_t code);
+    fs::path serialize(const fs::path& path);
+    bool deserialize(const fs::path& path, uint16_t& index);
+    bool deserializePostCodes(const fs::path& path,
+                              std::map<uint64_t, postcode_t>& codes);
 };
