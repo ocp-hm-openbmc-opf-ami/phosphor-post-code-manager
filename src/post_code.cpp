@@ -28,6 +28,10 @@ const static constexpr auto timeoutMicroSeconds = 1000000;
 
 void PostCode::deleteAll()
 {
+    if (timer && timer->isRunning())
+    {
+        timer->stop();
+    }
     std::uintmax_t n = fs::remove_all(postCodeListPath);
     std::cerr << "clearPostCodes deleted " << n << " files in "
               << postCodeListPath << std::endl;
@@ -46,19 +50,18 @@ std::vector<postcode_t> PostCode::getPostCodes(uint16_t index)
                                   std::to_string(maxBootCycleNum()).c_str()));
     }
     std::vector<postcode_t> codesVec;
-        uint16_t bootNum = getBootNum(index);
+    uint16_t bootNum = getBootNum(index);
 
-        decltype(postCodes) codes;
-        deserializePostCodes(postCodeListPath / std::to_string(bootNum), codes);
-        std::transform(codes.begin(), codes.end(), std::back_inserter(codesVec),
-                       [](const auto& kv) { return kv.second; });
+    decltype(postCodes) codes;
+    deserializePostCodes(postCodeListPath / std::to_string(bootNum), codes);
+    std::transform(codes.begin(), codes.end(), std::back_inserter(codesVec),
+                   [](const auto& kv) { return kv.second; });
     return codesVec;
 }
 
 std::map<uint64_t, postcode_t> PostCode::getPostCodesWithTimeStamp(
     uint16_t index)
 {
-
     uint16_t bootNum = getBootNum(index);
     decltype(postCodes) codes;
     deserializePostCodes(postCodeListPath / std::to_string(bootNum), codes);
@@ -84,13 +87,20 @@ void PostCode::savePostCodes(postcode_t code)
     {
         firstPostCodeTimeSteady = postCodeTimeSteady;
         firstPostCodeUsSinceEpoch = tsUS; // uS since epoch for 1st post code
-	 uint16_t count = currentBootCycleCount();
-        std::ifstream isEmpty(postCodeListPath / std::to_string(count),
-                              std::ios::binary);
-        isEmpty.seekg(0, std::ios::end);
-        if (!(isEmpty.tellg() == 8))
+        if (currentBootCycleIndex == 0)
         {
             incrBootCycle();
+        }
+        else
+        {
+            uint16_t count = currentBootCycleCount();
+            std::ifstream isEmpty(postCodeListPath / std::to_string(count),
+                                  std::ios::binary);
+            isEmpty.seekg(0, std::ios::end);
+            if (!(isEmpty.tellg() == 8))
+            {
+                incrBootCycle();
+            }
         }
     }
     else
