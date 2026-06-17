@@ -132,7 +132,7 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
                             {
                                 // Valid boot codes - persist them
                                 this->serialize(this->postCodeListPath);
-				this->postCodes.clear();
+                                this->postCodes.clear();
                             }
                             else
                             {
