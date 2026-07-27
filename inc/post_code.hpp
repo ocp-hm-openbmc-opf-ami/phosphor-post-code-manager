@@ -62,6 +62,27 @@ using Argument =
 namespace fs = std::filesystem;
 namespace StateServer = sdbusplus::xyz::openbmc_project::State::server;
 
+struct InvalidArgumentError : public sdbusplus::exception::internal_exception
+{
+    const char* name() const noexcept override
+    {
+        return "xyz.openbmc_project.Common.Error.InvalidArgument";
+    }
+    const char* description() const noexcept override
+    {
+        return "Invalid argument was given.";
+    }
+    const char* what() const noexcept override
+    {
+        return "xyz.openbmc_project.Common.Error.InvalidArgument: "
+               "Invalid argument was given.";
+    }
+    int get_errno() const noexcept override
+    {
+        return EINVAL;
+    }
+};
+
 using post_code =
     sdbusplus::xyz::openbmc_project::State::Boot::server::PostCode;
 using delete_all =
@@ -72,7 +93,7 @@ struct PostCode : sdbusplus::server::object_t<post_code, delete_all>
     PostCode(sdbusplus::bus_t& bus, const char* path, EventPtr& event,
              int nodeIndex) :
         sdbusplus::server::object_t<post_code, delete_all>(bus, path), bus(bus),
-        event(event), node(nodeIndex),
+        event(event), node(nodeIndex), firstPostCodeUsSinceEpoch(0),
         postCodeListPath(PostCodeListPathPrefix + std::to_string(node)),
         propertiesChangedSignalRaw(
             bus,
