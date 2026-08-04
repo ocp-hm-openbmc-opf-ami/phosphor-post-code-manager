@@ -79,3 +79,7 @@ executable(
     ],
     include_directories: 'inc',
 )
+
+if get_option('tests').enabled()
+    subdir('tests')
+endif
