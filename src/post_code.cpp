@@ -45,9 +45,11 @@ std::vector<postcode_t> PostCode::getPostCodes(uint16_t index)
 {
     if (index > maxBootCycleNum() || index == 0)
     {
-        elog<InvalidArgument>(Argument::ARGUMENT_NAME("MAXBOOTCYCLECOUNT"),
-                              Argument::ARGUMENT_VALUE(
-                                  std::to_string(maxBootCycleNum()).c_str()));
+        phosphor::logging::log<phosphor::logging::level::ERR>(
+            "GetPostCodes: invalid boot cycle index",
+            phosphor::logging::entry("INDEX=%d", index),
+            phosphor::logging::entry("MAX_BOOT_CYCLE=%d", maxBootCycleNum()));
+        throw InvalidArgumentError();
     }
     std::vector<postcode_t> codesVec;
     uint16_t bootNum = getBootNum(index);
